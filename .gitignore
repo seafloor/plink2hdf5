@@ -1,0 +1,7 @@
+tmp
+bin
+test
+train
+*.hdf5
+.snakemake
+config.yaml
