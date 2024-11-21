@@ -24,7 +24,7 @@ rule download_plink:
     output:
         "bin/plink2"
     params:
-        url=config['input']['plink_url']
+        url=config['env']['plink_url']
     shell:
         """
         mkdir -p bin
@@ -89,6 +89,10 @@ rule convert_raw_to_hdf5:
         out_dir=config['output']['dir']
     output:
         f"{config['output']['dir']}/{IN_FILE}_shuffled.hdf5"
+    envmodules:
+        config['env']['conda_module']
+    conda:
+        "envs/python_env.yaml"
     threads:
         config["run"]["threads"]
     shell:
@@ -120,21 +124,20 @@ rule generate_train_test_split:
         f"{config['output']['dir']}/test/test_ids.txt",
         f"{config['output']['dir']}/train/train_ids_plinkformat.txt",
         f"{config['output']['dir']}/test/test_ids_plinkformat.txt"
+    envmodules:
+        config['env']['conda_module']
+    conda:
+        "envs/python_env.yaml"
     threads:
         config["run"]["threads"]
-    run:
-        if not SPLIT_OUTPUT:
-            print("Warning: skipping train/test split as split is false or not set in config file")
-        else:
-            shell(
-                """
-                python3 scripts/split_ids.py \
-                    --file {params.infile} \
-                    --proportion {params.p_split} \
-                    --out_dir {params.outdir} \
-                    --seed {params.seed}
-                """
-            )
+    shell:
+        """
+        python3 scripts/split_ids.py \
+            --file {params.infile} \
+            --proportion {params.p_split} \
+            --out_dir {params.outdir} \
+            --seed {params.seed}
+        """
 
 rule split_hdf5_file:
     input:
@@ -151,33 +154,32 @@ rule split_hdf5_file:
     output:
         f"{config['output']['dir']}/train/{IN_FILE}_shuffled_train.hdf5",
         f"{config['output']['dir']}/test/{IN_FILE}_shuffled_test.hdf5"
+    envmodules:
+        config['env']['conda_module']
+    conda:
+        "envs/python_env.yaml"
     threads:
         config["run"]["threads"]
-    run:
-        if not SPLIT_OUTPUT:
-            print("Warning: skipping hdf5 file split as split is false or not set in config file")
-        else:
-            shell(
-                """
-                # subset train IDs and write to separate hdf5 file
-                python3 scripts/split_hdf5.py \
-                    --in_path {params.infile} \
-                    --out_path {params.train_outfile} \
-                    --ids {params.train_ids} \
-                    --row_chunks {params.row_chunks} \
-                    --xkey x \
-                    --ykey y
-                
-                # subset test IDs and write to separate hdf5 file
-                python3 scripts/split_hdf5.py \
-                    --in_path {params.infile} \
-                    --out_path {params.test_outfile} \
-                    --ids {params.test_ids} \
-                    --row_chunks {params.row_chunks} \
-                    --xkey x \
-                    --ykey y
-                """
-            )
+    shell:
+        """
+        # subset train IDs and write to separate hdf5 file
+        python3 scripts/split_hdf5.py \
+            --in_path {params.infile} \
+            --out_path {params.train_outfile} \
+            --ids {params.train_ids} \
+            --row_chunks {params.row_chunks} \
+            --xkey x \
+            --ykey y
+        
+        # subset test IDs and write to separate hdf5 file
+        python3 scripts/split_hdf5.py \
+            --in_path {params.infile} \
+            --out_path {params.test_outfile} \
+            --ids {params.test_ids} \
+            --row_chunks {params.row_chunks} \
+            --xkey x \
+            --ykey y
+        """
 
 rule split_plink_file:
     input:
@@ -204,27 +206,22 @@ rule split_plink_file:
         )
     threads:
         config["run"]["threads"]
-    run:
-        if not SPLIT_OUTPUT:
-            print("Warning: skipping hdf5 file split as split is false or not set in config file")
-        else:
-            shell(
-                """
-                # split train data for plink file
-                {params.tool} \
-                    --{params.file_type} {params.infile} \
-                    --keep {params.train_ids} \
-                    --out {params.train_outfile} \
-                    --{params.write_type}
-                
-                # split test data for plink file
-                {params.tool} \
-                    --{params.file_type} {params.infile} \
-                    --keep {params.test_ids} \
-                    --out {params.test_outfile} \
-                    --{params.write_type}
-                """
-            )
+    shell:
+        """
+        # split train data for plink file
+        {params.tool} \
+            --{params.file_type} {params.infile} \
+            --keep {params.train_ids} \
+            --out {params.train_outfile} \
+            --{params.write_type}
+        
+        # split test data for plink file
+        {params.tool} \
+            --{params.file_type} {params.infile} \
+            --keep {params.test_ids} \
+            --out {params.test_outfile} \
+            --{params.write_type}
+        """
 
 # add covariate adjustment - optional, non-urgent
 # make sure download for plink runs on head node but all else in slurm jobs
