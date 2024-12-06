@@ -1,10 +1,9 @@
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from .split_hdf5 import read_ml
-from .split_ids import read_covars, check_covars
+from split_hdf5 import read_ml
+from split_ids import read_covars, check_covars
 import argparse
 import numpy as np
-import tqdm
 import h5py
 import dask.array as da
 import sys
@@ -35,7 +34,7 @@ def parse_covars(f, ids):
 def run_regressions(X, covars):
     betas = []
 
-    for column in tqdm(np.arange(X.shape[1])):
+    for column in np.arange(X.shape[1]):
         lr = LinearRegression()
 
         # drop rows in covariates and X if missing values for predictor in X

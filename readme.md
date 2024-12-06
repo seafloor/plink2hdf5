@@ -23,6 +23,10 @@ snakemake --use-conda --conda-create-envs-only --conda-frontend conda --cores 1
 ### if installing directly
 conda create -f envs/python_env.yaml
 
+## set up config file
+cp example_config.yaml config.yaml
+then edit for your own paths
+
 # Running
 cd workflow
 
@@ -31,7 +35,6 @@ snakemake -np --use-envmodules --cores 1
 
 ## run the full workflow on slurm
 snakemake -p --use-envmodules --cores 1 --executor slurm --workflow-profile profiles/slurm --jobs 1
-
 
 ## run it locally in an interactive job
 salloc --job-name=snakemake --time=01:00:00 --nodes=1 --ntasks=1 --tasks-per-node=1 --mem-per-cpu=20G

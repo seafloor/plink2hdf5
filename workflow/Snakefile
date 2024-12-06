@@ -3,8 +3,8 @@ import os
 configfile: "config.yaml"
 localrules: download_plink
 
-PGEN_EXT = ["pgen", "pvar", "psam"]
-BED_EXT = ["bed", "bim", "fam"]
+PGEN_EXT = ["pgen", "pvar", "psam", "log"]
+BED_EXT = ["bed", "bim", "fam", "log"]
 RAW_EXT = ["raw", "log"]
 SPLIT_OUTPUT = config.get("output", {}).get("split", False)
 IN_FILE = os.path.basename(config.get("input", {}).get("data", ""))
