@@ -99,7 +99,7 @@ if __name__ == '__main__':
                         help='The key for the outcome in the hdf5 file')
     args = parser.parse_args()
 
-    ids = pd.read_csv(args.ids, header=None, squeeze=True, dtype=str).to_numpy() if args.ids is not None else None
+    ids = pd.read_csv(args.ids, header=None, dtype=str).squeeze("columns").to_numpy() if args.ids is not None else None
     assert ids.shape[0] > 1, f'ID file too short: shape {ids.shape}'
     print(f'--> Read {ids.shape[0]} IDs for subsetting. Sample: {ids[:5].flatten()}')
 

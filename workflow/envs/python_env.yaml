@@ -9,3 +9,5 @@ dependencies:
   - pandas
   - dask
   - h5py
+  - scikit-learn
+  - pytables

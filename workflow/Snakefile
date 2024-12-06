@@ -1,6 +1,7 @@
 import os
 
 configfile: "config.yaml"
+localrules: download_plink
 
 PGEN_EXT = ["pgen", "pvar", "psam"]
 BED_EXT = ["bed", "bim", "fam"]
@@ -10,15 +11,19 @@ IN_FILE = os.path.basename(config.get("input", {}).get("data", ""))
 
 rule all:
     input:
-        f"{config['output']['dir']}/train/{IN_FILE}_shuffled_train.hdf5",
-        f"{config['output']['dir']}/test/{IN_FILE}_shuffled_test.hdf5",
+        f"{config['output']['dir']}/train/{IN_FILE}_shuffled_adjusted_train.hdf5",
+        f"{config['output']['dir']}/test/{IN_FILE}_shuffled_adjusted_test.hdf5",
         expand(
             "{outdir}/{split}/{infile}_shuffled_{split}.{ext}",
             outdir=config['output']['dir'],
             split=["train", "test"],
             infile=IN_FILE,
             ext=PGEN_EXT if config['input']['file_type'] == 'pfile' else BED_EXT
-        )
+        ),
+        f"{config['output']['dir']}/train/train_ids.txt",
+        f"{config['output']['dir']}/test/test_ids.txt",
+        f"{config['output']['dir']}/train/train_ids_plinkformat.txt",
+        f"{config['output']['dir']}/test/test_ids_plinkformat.txt"
 
 rule download_plink:
     output:
@@ -45,10 +50,14 @@ rule convert_plink_to_raw:
         tool=config['input']['tool'],
         file_type=config['input']['file_type']
     output:
-        expand("{outdir}/tmp/{inpath}.{ext}",
+        temp(
+            expand(
+                "{outdir}/tmp/{inpath}.{ext}",
                outdir=config["output"]["dir"],
                inpath=IN_FILE,
-               ext=RAW_EXT)
+               ext=RAW_EXT
+            )
+        )
     threads:
         config["run"]["threads"]
     shell:
@@ -69,7 +78,7 @@ rule shuffle_raw_file:
     params:
         infile=f"{config['output']['dir']}/tmp/{IN_FILE}.raw"
     output:
-        f"{config['output']['dir']}/tmp/{IN_FILE}_shuffled.raw"
+        temp(f"{config['output']['dir']}/tmp/{IN_FILE}_shuffled.raw")
     threads:
         config["run"]["threads"]
     shell:
@@ -86,17 +95,19 @@ rule convert_raw_to_hdf5:
         dask_chunks=f"{config['output']['chunk_size']}",
         dask_dtype=f"{config['output']['dtype']}",
         tmp_file=f"{config['output']['dir']}/tmp/{IN_FILE}_shuffled.hdf5",
-        out_dir=config['output']['dir']
+        out_dir=config['output']['dir'],
+        job_module=config['env']['conda_module'],
+        job_env=config["env"]["job_env"]
     output:
-        f"{config['output']['dir']}/{IN_FILE}_shuffled.hdf5"
-    envmodules:
-        config['env']['conda_module']
-    conda:
-        "envs/python_env.yaml"
+        temp(f"{config['output']['dir']}/{IN_FILE}_shuffled.hdf5")
     threads:
         config["run"]["threads"]
     shell:
         """
+        module purge
+        module load {params.job_module}
+        conda activate {params.job_env}
+
         wc_raw=$(wc -l < {input})
         nrow_raw=$((wc_raw - 1))
         
@@ -118,20 +129,22 @@ rule generate_train_test_split:
         infile=config['input']['covar_file'],
         outdir=config['output']['dir'],
         p_split=config['output']['p_split'],
-        seed=config['run']['seed']
+        seed=config['run']['seed'],
+        job_module=config['env']['conda_module'],
+        job_env=config["env"]["job_env"]
     output:
         f"{config['output']['dir']}/train/train_ids.txt",
         f"{config['output']['dir']}/test/test_ids.txt",
         f"{config['output']['dir']}/train/train_ids_plinkformat.txt",
         f"{config['output']['dir']}/test/test_ids_plinkformat.txt"
-    envmodules:
-        config['env']['conda_module']
-    conda:
-        "envs/python_env.yaml"
     threads:
         config["run"]["threads"]
     shell:
         """
+        module purge
+        module load {params.job_module}
+        conda activate {params.job_env}
+
         python3 scripts/split_ids.py \
             --file {params.infile} \
             --proportion {params.p_split} \
@@ -150,18 +163,20 @@ rule split_hdf5_file:
         test_outfile=f"{config['output']['dir']}/test/{IN_FILE}_shuffled_test.hdf5",
         train_ids=f"{config['output']['dir']}/train/train_ids.txt",
         test_ids=f"{config['output']['dir']}/test/test_ids.txt",
-        row_chunks=config['output']['chunk_size']
+        row_chunks=config['output']['chunk_size'],
+        job_module=config['env']['conda_module'],
+        job_env=config["env"]["job_env"]
     output:
-        f"{config['output']['dir']}/train/{IN_FILE}_shuffled_train.hdf5",
-        f"{config['output']['dir']}/test/{IN_FILE}_shuffled_test.hdf5"
-    envmodules:
-        config['env']['conda_module']
-    conda:
-        "envs/python_env.yaml"
+        temp(f"{config['output']['dir']}/train/{IN_FILE}_shuffled_train.hdf5"),
+        temp(f"{config['output']['dir']}/test/{IN_FILE}_shuffled_test.hdf5")
     threads:
         config["run"]["threads"]
     shell:
         """
+        module purge
+        module load {params.job_module}
+        conda activate {params.job_env}
+
         # subset train IDs and write to separate hdf5 file
         python3 scripts/split_hdf5.py \
             --in_path {params.infile} \
@@ -223,7 +238,37 @@ rule split_plink_file:
             --{params.write_type}
         """
 
-# add covariate adjustment - optional, non-urgent
-# make sure download for plink runs on head node but all else in slurm jobs
-# needs python env attached to the python stuff
-# - 
+rule adjust_hdf5_for_covariates:
+    input:
+        f"{config['output']['dir']}/train/{IN_FILE}_shuffled_train.hdf5",
+        f"{config['output']['dir']}/test/{IN_FILE}_shuffled_test.hdf5",
+        config['input']['covar_file']
+    params:
+        in_train=f"{config['output']['dir']}/train/{IN_FILE}_shuffled_train.hdf5",
+        in_test=f"{config['output']['dir']}/test/{IN_FILE}_shuffled_test.hdf5",
+        out_train=f"{config['output']['dir']}/train/{IN_FILE}_shuffled_adjusted_train.hdf5",
+        out_test=f"{config['output']['dir']}/test/{IN_FILE}_shuffled_adjusted_test.hdf5",
+        std_covars=config["run"]["standardise_covariates"],
+        covar_file=config['input']['covar_file'],
+        job_module=config['env']['conda_module'],
+        job_env=config["env"]["job_env"]
+    output:
+        f"{config['output']['dir']}/train/{IN_FILE}_shuffled_adjusted_train.hdf5",
+        f"{config['output']['dir']}/test/{IN_FILE}_shuffled_adjusted_test.hdf5"
+    threads:
+        config["run"]["threads"]
+    shell:
+        """
+        module purge
+        module load {params.job_module}
+        conda activate {params.job_env}
+
+        python3 scripts/adjust_hdf5_for_covariates.py \
+            --train {params.in_train} \
+            --test {params.in_test} \
+            --covar {params.covar_file} \
+            --out_train {params.out_train} \
+            --out_test {params.out_test} \
+            --standardise_covars {params.std_covars} \
+            --write_unadjusted True
+        """

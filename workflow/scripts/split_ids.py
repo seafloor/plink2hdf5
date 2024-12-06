@@ -3,6 +3,32 @@ import numpy as np
 import argparse
 import os
 
+
+def read_covars(f, verbose=True, sep='\t'):
+    print('\n--> Reading covar file assuming plink format')
+    cov = pd.read_csv(f, sep=sep)
+
+    if verbose:
+        print('Head of covar file:\n')
+        print(cov.head())
+
+    return cov
+
+
+def check_covars(data):
+    assert data.columns[0] == 'FID', 'Covariate file missing labelled FID column'
+    assert data.columns[1] == 'IID', 'Covariate file missing labelled IID column'
+    assert data.shape[1] > 2, 'Covariate file requires > 2 columns (minimum: FID, IID, COV1)'
+    assert data.shape[0] > 1, f'Covariate file only has {data.shape[1]} rows'
+    assert data.shape[0] == data['IID'].unique().shape[0], 'Not all IIDs unique in covariate file'
+    assert data.shape[0] == data['FID'].unique().shape[0], 'Not all FIDs unique in covariate file'
+
+    print(f'--> Read covar file of shape {data.shape}')
+    print(f'Column names: {data.columns.to_numpy()}')
+    print('Sample head:\n')
+    print(data.head())
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Split IDs from covariate file',
                                      epilog='Author: Matthew Bracher-Smith (smithmr5@cardiff.ac.uk)')
@@ -18,18 +44,8 @@ if __name__ == '__main__':
 
     np.random.seed(args.seed)
 
-    df = pd.read_csv(args.file, sep='\t')
-    assert 'FID' in df.columns, 'Covariate file missing labelled FID column'
-    assert 'IID' in df.columns, 'Covariate file missing labelled IID column'
-    assert df.shape[1] > 2, 'Covariate file requires > 2 columns (minimum: FID, IID, COV1)'
-    assert df.shape[0] > 1, f'Covariate file only has {df.shape[1]} rows'
-    assert df.shape[0] == df['IID'].unique().shape[0], 'Not all IIDs unique in covariate file'
-    assert df.shape[0] == df['FID'].unique().shape[0], 'Not all FIDs unique in covariate file'
-
-    print(f'--> Read covar file of shape {df.shape}')
-    print(f'Column names: {df.columns.to_numpy()}')
-    print('Sample head:\n')
-    print(df.head())
+    df = read_covars(args.file, verbose=False)
+    check_covars(df)
 
     train = df.sample(frac=args.proportion)
     test = df.loc[~df['IID'].isin(train['IID'].to_numpy()), :]
