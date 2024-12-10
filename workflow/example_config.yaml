@@ -19,6 +19,7 @@ run:
   standardise_covariates: "True"
 
 env:
-  plink_url: "https://s3.amazonaws.com/plink2-assets/alpha6/plink2_linux_avx2_20241114.zip" # linux 64-bit
+  plink1_url: "https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20241022.zip" # linux 64-bit
+  plink2_url: "https://s3.amazonaws.com/plink2-assets/alpha6/plink2_linux_avx2_20241114.zip" # linux 64-bit
   conda_module: yourcondamodule/version # to be loaded with `module load conda_module`
   job_env: "plink2hdf5" # don't change
