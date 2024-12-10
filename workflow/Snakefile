@@ -1,7 +1,7 @@
 import os
 
 configfile: "config.yaml"
-localrules: download_plink
+localrules: download_plink1, download_plink2
 
 PGEN_EXT = ["pgen", "pvar", "psam", "log"]
 BED_EXT = ["bed", "bim", "fam", "log"]
@@ -25,11 +25,29 @@ rule all:
         f"{config['output']['dir']}/train/train_ids_plinkformat.txt",
         f"{config['output']['dir']}/test/test_ids_plinkformat.txt"
 
-rule download_plink:
+rule download_plink1:
+    output:
+        "bin/plink"
+    params:
+        url=config['env']['plink1_url']
+    shell:
+        """
+        mkdir -p bin
+        wget -O bin/plink.zip {params.url}
+        unzip bin/plink.zip -d bin/
+        rm -f bin/plink.zip
+        chmod +x bin/plink
+        rm -f bin/LICENSE
+        rm -f toy.ped
+        rm -f toy.map
+        rm -f prettify
+        """
+
+rule download_plink2:
     output:
         "bin/plink2"
     params:
-        url=config['env']['plink_url']
+        url=config['env']['plink2_url']
     shell:
         """
         mkdir -p bin
