@@ -25,6 +25,7 @@ Still needs:
 # Installation
 
 ## Download and install the requirements
+
 ```
 git clone https://github.com/seafloor/plink2hdf5.git
 cd plink2hdf5
@@ -45,8 +46,12 @@ cd workflow
 conda create -f envs/python_env.yaml
 ```
 
+Note that the download_plink rules from the snakefile will automatically be run on the head node as they are defined as local rules. To ensure this works, snakemake should always be called from the head node, and will then submit jobs for each of the rules (i.e. don't start an interactive job and then try to run the snakemake workflow from a compute node).
+
 ## Customise the config file
+
 Everything is managed via a config file - you shouldn't need to touch the snakefile. Copy the example and edit:
+
 ```
 cp example_config.yaml config.yaml
 vim config.yaml # add your own paths etc.
@@ -57,17 +62,21 @@ vim config.yaml # add your own paths etc.
 ## Check the workflow (dry run)
 Check a dry run to see the workflow:
 ```
-snakemake -np --use-envmodules --cores 1
+snakemake -np --cores 1 --jobs 1
 ```
 
 ## Run the full workflow on slurm
+
+Make sure config.yaml exists and is correct first:
+
 ```
-# make sure config.yaml exists and is correct first!
-snakemake -p --use-envmodules --cores 1 --executor slurm --workflow-profile profiles/slurm --jobs 1
+snakemake -p --cores 1 --executor slurm --workflow-profile profiles/slurm --jobs 1
 ```
 
 ## Debugging possible conda fixes
+
 Some systems have issues with the conda version not being found by snakemake. You make need to run the lines below to fix this.
+
 ```
 ~/.conda/envs/snakemake/bin/conda init
 source ~/.bashrc
